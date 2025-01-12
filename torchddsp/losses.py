@@ -24,7 +24,7 @@ import numpy as np
 import torch
 
 
-def mean_difference(target, value, loss_type='L1', weights=None):
+def mean_difference(target, value, loss_type="L1", weights=None):
     """Common loss functions.
     Args:
       target: Target tensor.
@@ -39,17 +39,16 @@ def mean_difference(target, value, loss_type='L1', weights=None):
     difference = target - value
     weights = 1.0 if weights is None else weights
     loss_type = loss_type.upper()
-    if loss_type == 'L1':
+    if loss_type == "L1":
         dims = [x for x in range(len(difference.shape))]
         return torch.mean(torch.abs(difference * weights), dim=dims)
-    elif loss_type == 'L2':
+    elif loss_type == "L2":
         dims = [x for x in range(len(difference.shape))]
         return torch.mean(difference**2 * weights, dim=dims)
     # elif loss_type == 'COSINE':
-        # return tf.losses.cosine_distance(target, value, weights=weights, axis=-1)
+    # return tf.losses.cosine_distance(target, value, weights=weights, axis=-1)
     else:
-        raise ValueError('Loss type ({}), must be '
-                         '"L1", "L2" '.format(loss_type))
+        raise ValueError("Loss type ({}), must be " '"L1", "L2" '.format(loss_type))
 
 
 class SpectralLoss(torch.nn.Module):
@@ -60,17 +59,18 @@ class SpectralLoss(torch.nn.Module):
     are magnitudes (mag_weight) and log magnitudes (logmag_weight).
     """
 
-    def __init__(self,
-                 fft_sizes=(2048, 1024, 512, 256, 128, 64),
-                 loss_type='L1',
-                 mag_weight=1.0,
-                 delta_time_weight=0.0,
-                 delta_freq_weight=0.0,
-                 cumsum_freq_weight=0.0,
-                 logmag_weight=0.0,
-                 logmel_weight=0.0
-                 #loudness_weight=0.0
-                 ):
+    def __init__(
+        self,
+        fft_sizes=(2048, 1024, 512, 256, 128, 64),
+        loss_type="L1",
+        mag_weight=1.0,
+        delta_time_weight=0.0,
+        delta_freq_weight=0.0,
+        cumsum_freq_weight=0.0,
+        logmag_weight=0.0,
+        logmel_weight=0.0,
+        # loudness_weight=0.0
+    ):
         """Constructor, set loss weights of various components.
         Args:
           fft_sizes: Compare spectrograms at each of this list of fft sizes. Each
@@ -110,10 +110,14 @@ class SpectralLoss(torch.nn.Module):
 
         self.spectrogram_ops = []
         for size in self.fft_sizes:
-            spectrogram_op = functools.partial(spectral_ops.compute_mag, size=size, add_in_sqrt=1e-10)
+            spectrogram_op = functools.partial(
+                spectral_ops.compute_mag, size=size, add_in_sqrt=1e-10
+            )
             self.spectrogram_ops.append(spectrogram_op)
         if self.logmel_weight > 0:
-            self.logmel_op = functools.partial(spectral_ops.compute_logmel, bins=500, add_in_sqrt=1e-10)
+            self.logmel_op = functools.partial(
+                spectral_ops.compute_logmel, bins=500, add_in_sqrt=1e-10
+            )
 
     def forward(self, target_audio, audio):
 
@@ -129,33 +133,38 @@ class SpectralLoss(torch.nn.Module):
 
             # Add magnitude loss.
             if self.mag_weight > 0:
-                loss += self.mag_weight * mean_difference(target_mag, value_mag,
-                                                          self.loss_type)
+                loss += self.mag_weight * mean_difference(
+                    target_mag, value_mag, self.loss_type
+                )
 
             if self.delta_time_weight > 0:
                 target = diff(target_mag, axis=1)
                 value = diff(value_mag, axis=1)
                 loss += self.delta_time_weight * mean_difference(
-                    target, value, self.loss_type)
+                    target, value, self.loss_type
+                )
 
             if self.delta_freq_weight > 0:
                 target = diff(target_mag, axis=2)
                 value = diff(value_mag, axis=2)
                 loss += self.delta_freq_weight * mean_difference(
-                    target, value, self.loss_type)
+                    target, value, self.loss_type
+                )
 
             if self.cumsum_freq_weight > 0:
                 target = cumsum(target_mag, dim=2)
                 value = cumsum(value_mag, dim=2)
                 loss += self.cumsum_freq_weight * mean_difference(
-                    target, value, self.loss_type)
+                    target, value, self.loss_type
+                )
 
             # Add logmagnitude loss, reusing spectrogram.
             if self.logmag_weight > 0:
                 target = spectral_ops.safe_log(target_mag)
                 value = spectral_ops.safe_log(value_mag)
-                loss += self.logmag_weight * mean_difference(target, value,
-                                                             self.loss_type)
+                loss += self.logmag_weight * mean_difference(
+                    target, value, self.loss_type
+                )
 
         if self.logmel_weight > 0:
             target = self.logmel_op(target_audio)[:250, :]
@@ -190,4 +199,3 @@ class LSFRegularizer(torch.nn.Module):
         loss = torch.mean(delta_lsf_l2, dim=dims)
 
         return loss
-
