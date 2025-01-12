@@ -9,8 +9,8 @@ import torchaudio
 import numpy as np
 import scipy.signal
 
-from ddsp import processors
-from ddsp import core, spectral_ops
+from torchddsp import processors
+from torchddsp import core, spectral_ops
 
 import matplotlib.pyplot as plt
 
@@ -863,12 +863,12 @@ class SourceFilterSynth2(processors.Processor):
         # noise model
         if self.estimate_voiced_noise_mag:
             noise_control_dict = self.noise_synth.get_controls(
-                noise_gain, voiced_noise_magnitudes[0], voiced_unvoiced
-            )
+                noise_gain, voiced_noise_magnitudes[0], voiced_unvoiced # type: ignore
+            ) # type: ignore
         else:
             noise_control_dict = self.noise_synth.get_controls(
                 noise_gain, voiced_unvoiced
-            )
+            ) # type: ignore
 
         # vocal tract filter
         line_spectral_frequencies = core.lsf_activation(line_spectral_frequencies)
@@ -923,10 +923,10 @@ class SourceFilterSynth2(processors.Processor):
 
         if self.estimate_voiced_noise_mag:
             noise = self.noise_synth.get_signal(
-                noise_gain, kwargs["voiced_noise_magnitudes"], voiced_unvoiced
+                noise_gain, kwargs["voiced_noise_magnitudes"], voiced_unvoiced # type: ignore
             )
         else:
-            noise = self.noise_synth.get_signal(noise_gain, voiced_unvoiced)
+            noise = self.noise_synth.get_signal(noise_gain, voiced_unvoiced) # type: ignore
 
         source = harmonics + noise
 

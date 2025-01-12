@@ -6,7 +6,7 @@ import spectrum
 
 import unittest
 
-from ddsp import core, synths
+from torchddsp import core, synths
 
 
 class TestCore(unittest.TestCase):

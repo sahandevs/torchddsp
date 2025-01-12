@@ -15,10 +15,10 @@
 
 import functools
 
-from ddsp import spectral_ops
-from ddsp.core import hz_to_midi
-from ddsp.core import safe_divide
-from ddsp.core import torch_float32
+from torchddsp import spectral_ops
+from torchddsp.core import hz_to_midi
+from torchddsp.core import safe_divide
+from torchddsp.core import torch_float32
 
 import numpy as np
 import torch

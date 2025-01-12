@@ -14,12 +14,11 @@
 # PyTorch implementation of DDSP following closely the original code
 # https://github.com/magenta/ddsp/blob/master/ddsp/core.py
 
-from typing import Any, Dict, Text, TypeVar
+from typing import Any, Dict, Optional, Text, TypeVar, Union
 
 import torch
 import torchaudio
 import numpy as np
-from scipy import fftpack
 
 Number = TypeVar("Number", int, float, np.ndarray, torch.Tensor)
 
@@ -136,8 +135,8 @@ def get_harmonic_frequencies(
 def harmonic_synthesis(
     frequencies: torch.Tensor,
     amplitudes: torch.Tensor,
-    harmonic_shifts: torch.Tensor = None,
-    harmonic_distribution: torch.Tensor = None,
+    harmonic_shifts: Optional[torch.Tensor] = None,
+    harmonic_distribution: Optional[torch.Tensor] = None,
     n_samples: int = 64000,
     sample_rate: int = 16000,
     amp_resample_method: str = "window",
@@ -597,7 +596,7 @@ def frequency_impulse_response(
         -1
     )  # add last dimension for real and imaginary parts
     magnitudes = torch.cat([magnitudes, torch.zeros_like(magnitudes)], dim=-1)
-    impulse_response = torch.irfft(magnitudes, signal_ndim=1)
+    impulse_response = torch.fft.irfft(magnitudes, signal_ndim=1)
 
     # Window and put in causal form.
     impulse_response = apply_window_to_impulse_response(impulse_response, window_size)
@@ -771,8 +770,8 @@ def fft_convolve(
     pad_length_ir = fft_size - ir_size
     impulse_response = torch.nn.functional.pad(impulse_response, pad=(0, pad_length_ir))
 
-    audio_fft = torch.view_as_complex(torch.rfft(audio_frames, signal_ndim=1))
-    ir_fft = torch.view_as_complex(torch.rfft(impulse_response, signal_ndim=1))
+    audio_fft = torch.view_as_complex(torch.fft.rfft(audio_frames, signal_ndim=1))
+    ir_fft = torch.view_as_complex(torch.fft.rfft(impulse_response, signal_ndim=1))
 
     if cross_fade:
         audio_frames_out = cross_fade_time_varying_fir(
@@ -785,7 +784,7 @@ def fft_convolve(
 
         # Take the IFFT to resynthesize audio.
         audio_ir_fft = torch.view_as_real(audio_ir_fft)
-        audio_frames_out = torch.irfft(
+        audio_frames_out = torch.fft.irfft(
             audio_ir_fft, signal_ndim=1, signal_sizes=(audio_frames.shape[-1],)
         )
 
@@ -837,12 +836,12 @@ def cross_fade_time_varying_fir(
 
     # Take the IFFT to resynthesize audio.
     audio_ir_fft = torch.view_as_real(audio_ir_fft)
-    audio_frames_out = torch.irfft(
+    audio_frames_out = torch.fft.irfft(
         audio_ir_fft, signal_ndim=1, signal_sizes=(fft_size,)
     )
 
     audio_ir_fft_prev = torch.view_as_real(audio_ir_fft_prev)
-    audio_frames_out_prev = torch.irfft(
+    audio_frames_out_prev = torch.fft.irfft(
         audio_ir_fft_prev, signal_ndim=1, signal_sizes=(fft_size,)
     )
 
@@ -881,7 +880,7 @@ def fft_convolve_windowed(
     audio: torch.Tensor,
     impulse_response: torch.Tensor,
     audio_frame_size: int = 1024,
-    audio_frame_overlap: int = 0.75,
+    audio_frame_overlap: float = 0.75,
     padding: str = "same",
     delay_compensation: int = -1,
 ) -> torch.Tensor:
@@ -989,15 +988,15 @@ def fft_convolve_windowed(
     pad_length_ir = fft_size - ir_size
     impulse_response = torch.nn.functional.pad(impulse_response, pad=(0, pad_length_ir))
 
-    audio_fft = torch.view_as_complex(torch.rfft(audio_frames, signal_ndim=1))
-    ir_fft = torch.view_as_complex(torch.rfft(impulse_response, signal_ndim=1))
+    audio_fft = torch.view_as_complex(torch.fft.rfft(audio_frames, signal_ndim=1))
+    ir_fft = torch.view_as_complex(torch.fft.rfft(impulse_response, signal_ndim=1))
 
     # Multiply the FFTs (same as convolution in time).
     audio_ir_fft = audio_fft * ir_fft
 
     # Take the IFFT to resynthesize audio.
     audio_ir_fft = torch.view_as_real(audio_ir_fft)
-    audio_frames_out = torch.irfft(
+    audio_frames_out = torch.fft.irfft(
         audio_ir_fft, signal_ndim=1, signal_sizes=(audio_frames.shape[-1],)
     )
 
@@ -1049,7 +1048,8 @@ def get_fft_size(frame_size: int, ir_size: int, power_of_2: bool = True) -> int:
         # Next power of 2.
         fft_size = int(2 ** np.ceil(np.log2(convolved_frame_size)))
     else:
-        fft_size = int(fftpack.helper.next_fast_len(convolved_frame_size))
+        from scipy import fft
+        fft_size = int(fft.next_fast_len(convolved_frame_size)) # type: ignore
     return fft_size
 
 
@@ -1439,9 +1439,9 @@ def frequencies_sigmoid(
         else:
             # Reduce max by a constant factor for each depth element.
             hz_max = remainder * (1.0 - 1.0 / scale_factor)
-            hz_min = 0
+            hz_min = float(0)
             remainder -= hz_max
-        hz_scales.append(unit_to_hz(f_probs[..., i], hz_min=hz_min, hz_max=hz_max))
+        hz_scales.append(unit_to_hz(f_probs[..., i], hz_min=hz_min, hz_max=hz_max)) # type: ignore
 
     return torch.sum(torch.stack(hz_scales, dim=-1), dim=-1)
 
@@ -1476,8 +1476,8 @@ def frequencies_softmax(
     # unit_bins represents a number of frequencies in unit scale that are combined by the softmax output.
     # This way, arbitrary frequencies can be chosen. The number of frequencies is given by n_sinusoids.
     # [B, T, N]
-    f_unit = torch.sum(unit_bins * f_probs, axis=-1, keepdim=False)
-    return unit_to_hz(f_unit, hz_min=hz_min, hz_max=hz_max)
+    f_unit = torch.sum(unit_bins * f_probs, dim=-1, keepdim=False)
+    return unit_to_hz(f_unit, hz_min=hz_min, hz_max=hz_max) # type: ignore
 
 
 def _add_depth_axis(freqs: torch.Tensor, depth: int = 1) -> torch.Tensor:
@@ -1503,26 +1503,26 @@ def unit_to_midi(
     unit: Number, midi_min: Number = 20.0, midi_max: Number = 90.0, clip: bool = False
 ) -> Number:
     """Map the unit interval [0, 1] to MIDI notes."""
-    unit = torch.clamp(unit, 0.0, 1.0) if clip else unit
-    return midi_min + (midi_max - midi_min) * unit
+    unit = torch.clamp(unit, 0.0, 1.0) if clip else unit # type: ignore
+    return midi_min + (midi_max - midi_min) * unit # type: ignore
 
 
 def midi_to_hz(notes: Number) -> Number:
     """TF-compatible midi_to_hz function."""
-    notes = torch_float32(notes)
-    return 440.0 * (2.0 ** ((notes - 69.0) / 12.0))
+    notes = torch_float32(notes) # type: ignore
+    return 440.0 * (2.0 ** ((notes - 69.0) / 12.0)) # type: ignore
 
 
 def hz_to_midi(frequencies: Number) -> Number:
     """TF-compatible hz_to_midi function."""
-    frequencies = torch_float32(frequencies)
+    frequencies = torch_float32(frequencies) # type: ignore
     notes = 12.0 * (logb(frequencies, 2.0) - logb(440.0, 2.0)) + 69.0
     # Map 0 Hz to MIDI 0 (Replace -inf MIDI with 0.)
     notes = torch.where(
-        frequencies <= 0.0,
-        torch.tensor(0.0, dtype=torch.float32, device=frequencies.device),
+        frequencies <= 0.0, # type: ignore
+        torch.tensor(0.0, dtype=torch.float32, device=frequencies.device), # type: ignore
         notes,
-    )
+    ) # type: ignore
     return notes
 
 
@@ -1541,7 +1541,7 @@ def midi_to_unit(
 ) -> Number:
     """Map MIDI notes to the unit interval [0, 1]."""
     unit = (midi - midi_min) / (midi_max - midi_min)
-    return torch.clamp(unit, 0.0, 1.0) if clip else unit
+    return torch.clamp(unit, 0.0, 1.0) if clip else unit # type: ignore
 
 
 def safe_divide(numerator, denominator, eps=1e-7):
