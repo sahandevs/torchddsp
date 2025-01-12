@@ -1,0 +1,1 @@
+port of [umss/ddsp](https://github.com/schufo/umss/tree/main/ddsp) to newer version of pytorch (2.3.1)
