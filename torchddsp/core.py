@@ -596,7 +596,7 @@ def frequency_impulse_response(
         -1
     )  # add last dimension for real and imaginary parts
     magnitudes = torch.cat([magnitudes, torch.zeros_like(magnitudes)], dim=-1)
-    impulse_response = torch.fft.irfft(magnitudes, signal_ndim=1)
+    impulse_response = torch.fft.irfft(magnitudes, dim=-1)
 
     # Window and put in causal form.
     impulse_response = apply_window_to_impulse_response(impulse_response, window_size)
@@ -723,6 +723,7 @@ def fft_convolve(
         ir_shape = impulse_response.shape
 
     # Get shapes of audio and impulse response.
+    print(ir_shape)
     batch_size_ir, n_ir_frames, ir_size = ir_shape
     batch_size, audio_size = audio.shape
 
@@ -785,7 +786,7 @@ def fft_convolve(
         # Take the IFFT to resynthesize audio.
         audio_ir_fft = torch.view_as_real(audio_ir_fft)
         audio_frames_out = torch.fft.irfft(
-            audio_ir_fft, signal_ndim=1, signal_sizes=(audio_frames.shape[-1],)
+            audio_ir_fft, dim=-1, n=audio_frames.shape[-1]
         )
 
     audio_frames_out = audio_frames_out.transpose(
@@ -837,12 +838,12 @@ def cross_fade_time_varying_fir(
     # Take the IFFT to resynthesize audio.
     audio_ir_fft = torch.view_as_real(audio_ir_fft)
     audio_frames_out = torch.fft.irfft(
-        audio_ir_fft, signal_ndim=1, signal_sizes=(fft_size,)
+        audio_ir_fft, dim=-1, n=fft_size
     )
 
     audio_ir_fft_prev = torch.view_as_real(audio_ir_fft_prev)
     audio_frames_out_prev = torch.fft.irfft(
-        audio_ir_fft_prev, signal_ndim=1, signal_sizes=(fft_size,)
+        audio_ir_fft_prev, dim=-1, n=fft_size
     )
 
     convolved_frame_size = (
@@ -997,7 +998,7 @@ def fft_convolve_windowed(
     # Take the IFFT to resynthesize audio.
     audio_ir_fft = torch.view_as_real(audio_ir_fft)
     audio_frames_out = torch.fft.irfft(
-        audio_ir_fft, signal_ndim=1, signal_sizes=(audio_frames.shape[-1],)
+        audio_ir_fft, dim=-11, n=audio_frames.shape[-1]
     )
 
     # audio_frames_out = torch.ones_like(audio_frames_out)
