@@ -43,15 +43,9 @@ def stft(audio, frame_size=2048, overlap=0.75, center=False, pad_end=True):
     )
     return s
 
-
 def istft(stft, frame_size=2048, overlap=0.75, center=False, length=64000):
     """Differentiable istft in PyTorch, computed in batch."""
-
-    # stft [batch_size, fft_size//2 + 1, n_frames, 2]
-
-    stft = torch_float32(stft)
     hop_length = int(frame_size * (1.0 - overlap))
-
     assert frame_size * overlap % 2.0 == 0.0
     window = torch.hann_window(int(frame_size), device=stft.device)
     s = torch.istft(
@@ -63,8 +57,7 @@ def istft(stft, frame_size=2048, overlap=0.75, center=False, length=64000):
         center=center,
         length=length,
     )
-    return s
-
+    return s.float()
 
 def compute_mag(
     audio, size=2048, overlap=0.75, pad_end=True, center=False, add_in_sqrt=0.0
@@ -73,8 +66,8 @@ def compute_mag(
         audio, frame_size=size, overlap=overlap, center=center, pad_end=pad_end
     )
     # add_in_sqrt is added before sqrt is taken because the gradient of torch.sqrt(0) is NaN
-    mag = torch.sqrt(stft_cmplx[..., 0] ** 2 + stft_cmplx[..., 1] ** 2 + add_in_sqrt)
-    return torch_float32(mag)
+    mag = torch.sqrt(stft_cmplx.real ** 2 + stft_cmplx.imag ** 2 + add_in_sqrt)
+    return mag.float()
 
 
 def compute_mel(
