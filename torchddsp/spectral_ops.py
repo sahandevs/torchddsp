@@ -39,6 +39,7 @@ def stft(audio, frame_size=2048, overlap=0.75, center=False, pad_end=True):
         win_length=int(frame_size),
         window=window,
         center=center,
+        return_complex=True
     )
     return s
 

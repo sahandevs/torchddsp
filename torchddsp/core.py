@@ -596,7 +596,9 @@ def frequency_impulse_response(
         -1
     )  # add last dimension for real and imaginary parts
     magnitudes = torch.cat([magnitudes, torch.zeros_like(magnitudes)], dim=-1)
-    impulse_response = torch.fft.irfft(magnitudes, dim=-1)
+    magnitudes_complex = torch.view_as_complex(magnitudes)
+    n = 2 * magnitudes_complex.size(-1) - 1
+    impulse_response = torch.fft.irfft(magnitudes_complex, n=n, dim=-1)
 
     # Window and put in causal form.
     impulse_response = apply_window_to_impulse_response(impulse_response, window_size)
@@ -723,7 +725,6 @@ def fft_convolve(
         ir_shape = impulse_response.shape
 
     # Get shapes of audio and impulse response.
-    print(ir_shape)
     batch_size_ir, n_ir_frames, ir_size = ir_shape
     batch_size, audio_size = audio.shape
 
@@ -771,8 +772,8 @@ def fft_convolve(
     pad_length_ir = fft_size - ir_size
     impulse_response = torch.nn.functional.pad(impulse_response, pad=(0, pad_length_ir))
 
-    audio_fft = torch.view_as_complex(torch.fft.rfft(audio_frames, signal_ndim=1))
-    ir_fft = torch.view_as_complex(torch.fft.rfft(impulse_response, signal_ndim=1))
+    audio_fft = torch.fft.rfft(audio_frames, dim=-1)
+    ir_fft = torch.fft.rfft(impulse_response, dim=-1)
 
     if cross_fade:
         audio_frames_out = cross_fade_time_varying_fir(
@@ -784,9 +785,8 @@ def fft_convolve(
         audio_ir_fft = audio_fft * ir_fft
 
         # Take the IFFT to resynthesize audio.
-        audio_ir_fft = torch.view_as_real(audio_ir_fft)
         audio_frames_out = torch.fft.irfft(
-            audio_ir_fft, dim=-1, n=audio_frames.shape[-1]
+            audio_ir_fft, dim=-1
         )
 
     audio_frames_out = audio_frames_out.transpose(
@@ -836,12 +836,10 @@ def cross_fade_time_varying_fir(
     audio_ir_fft_prev = audio_fft * torch.roll(ir_fft, shifts=1, dims=1)
 
     # Take the IFFT to resynthesize audio.
-    audio_ir_fft = torch.view_as_real(audio_ir_fft)
     audio_frames_out = torch.fft.irfft(
         audio_ir_fft, dim=-1, n=fft_size
     )
 
-    audio_ir_fft_prev = torch.view_as_real(audio_ir_fft_prev)
     audio_frames_out_prev = torch.fft.irfft(
         audio_ir_fft_prev, dim=-1, n=fft_size
     )
@@ -996,7 +994,6 @@ def fft_convolve_windowed(
     audio_ir_fft = audio_fft * ir_fft
 
     # Take the IFFT to resynthesize audio.
-    audio_ir_fft = torch.view_as_real(audio_ir_fft)
     audio_frames_out = torch.fft.irfft(
         audio_ir_fft, dim=-11, n=audio_frames.shape[-1]
     )

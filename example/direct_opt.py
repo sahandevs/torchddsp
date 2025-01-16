@@ -3,11 +3,11 @@ import sys
 cwd = os.getcwd()
 
 sys.path.insert(0,os.path.join(cwd, ".."))
-
 import torch
 from torchddsp import losses, synths, core
 import tqdm
 
+torch.set_default_device("cuda")
 n_sources = 2
 n_frames = 250
 
@@ -105,6 +105,7 @@ for i in pbar:
         print(f"source {i}:")
 
   x = data[0].unsqueeze(0)  # mix
+  x = x.to("cuda")
   optimizer.zero_grad()
   y_hat, _ = d_model()
   loss_fn = losses.SpectralLoss(
